@@ -1,4 +1,4 @@
-import type { Router } from 'express';
+import type { RequestHandler, Router } from 'express';
 import type { BookingRepository } from './infrastructure/persistence/booking.repository';
 import { InMemoryBookingRepository } from './infrastructure/persistence/booking.repository';
 import { PrismaBookingRepository } from './infrastructure/persistence/prisma-booking.repository';
@@ -10,6 +10,7 @@ import { UpdateBookingUseCase } from './domain/update-booking.use-case';
 import { ChangeBookingStateUseCase } from './domain/change-booking-state.use-case';
 import { DeleteBookingUseCase } from './domain/delete-booking.use-case';
 import { CheckAvailabilityUseCase } from './domain/check-availability.use-case';
+import { ListOccupiedDaysUseCase } from './domain/list-occupied-days.use-case';
 import { BookingsRouter } from './infrastructure/transport/bookings.router';
 
 // Selecciona la implementación de persistencia. Por defecto, en memoria (los
@@ -21,10 +22,11 @@ function createBookingRepository(): BookingRepository {
   return new InMemoryBookingRepository();
 }
 
-export function buildBookingsRouter(): Router {
+export function buildBookingsRouter(requireAuth: RequestHandler): Router {
   const repository = createBookingRepository();
 
   return BookingsRouter({
+    requireAuth,
     createBooking: new CreateBookingUseCase(repository),
     listBookings: new ListBookingsUseCase(repository),
     getBookingById: new GetBookingByIdUseCase(repository),
@@ -32,5 +34,6 @@ export function buildBookingsRouter(): Router {
     changeBookingState: new ChangeBookingStateUseCase(repository),
     deleteBooking: new DeleteBookingUseCase(repository),
     checkAvailability: new CheckAvailabilityUseCase(repository),
+    listOccupiedDays: new ListOccupiedDaysUseCase(repository),
   });
 }

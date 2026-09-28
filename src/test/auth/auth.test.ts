@@ -24,7 +24,8 @@ const app = createApp();
  *  - GET  /auth/me     → requiere token. Devuelve el usuario autenticado
  *
  * Regla de acceso: los endpoints requieren token JWT válido salvo
- * `POST /auth/login`, `GET /health` y las lecturas `GET /events`.
+ * `POST /auth/login`, `GET /health`, las lecturas `GET /news` y `GET /events`
+ * y los días ocupados del refugio, `GET /bookings/availability`.
  */
 
 // Credenciales del administrador semilla que la implementación debe crear para
@@ -186,8 +187,26 @@ describe('Autenticación', () => {
       expect(res.status).toBe(200);
     });
 
-    it('GET /news devuelve 401 sin token', async () => {
+    it('GET /news es público: responde 200 sin token', async () => {
       const res = await request(app).get('/news');
+
+      expect(res.status).toBe(200);
+    });
+
+    it('POST /news permanece protegido: devuelve 401 sin token', async () => {
+      const res = await request(app).post('/news');
+
+      expect(res.status).toBe(401);
+    });
+
+    it('PUT /news/:id permanece protegido: devuelve 401 sin token', async () => {
+      const res = await request(app).put('/news/1');
+
+      expect(res.status).toBe(401);
+    });
+
+    it('DELETE /news/:id permanece protegido: devuelve 401 sin token', async () => {
+      const res = await request(app).delete('/news/1');
 
       expect(res.status).toBe(401);
     });
@@ -222,19 +241,55 @@ describe('Autenticación', () => {
       expect(res.status).toBe(401);
     });
 
-    it('GET /news devuelve 401 si el token es inválido', async () => {
+    it('GET /bookings/availability es público: responde 200 sin token', async () => {
+      const res = await request(app).get('/bookings/availability?from=2026-10-01&to=2026-10-31');
+
+      expect(res.status).toBe(200);
+    });
+
+    it('GET /bookings/:id permanece protegido: devuelve 401 sin token', async () => {
+      const res = await request(app).get('/bookings/1');
+
+      expect(res.status).toBe(401);
+    });
+
+    it('POST /bookings permanece protegido: devuelve 401 sin token', async () => {
+      const res = await request(app).post('/bookings');
+
+      expect(res.status).toBe(401);
+    });
+
+    it('PUT /bookings/:id permanece protegido: devuelve 401 sin token', async () => {
+      const res = await request(app).put('/bookings/1');
+
+      expect(res.status).toBe(401);
+    });
+
+    it('PATCH /bookings/:id/state permanece protegido: devuelve 401 sin token', async () => {
+      const res = await request(app).patch('/bookings/1/state');
+
+      expect(res.status).toBe(401);
+    });
+
+    it('DELETE /bookings/:id permanece protegido: devuelve 401 sin token', async () => {
+      const res = await request(app).delete('/bookings/1');
+
+      expect(res.status).toBe(401);
+    });
+
+    it('GET /jobs devuelve 401 si el token es inválido', async () => {
       const res = await request(app)
-        .get('/news')
+        .get('/jobs')
         .set('Authorization', 'Bearer token-invalido');
 
       expect(res.status).toBe(401);
     });
 
-    it('GET /news responde 200 con un token válido', async () => {
+    it('GET /jobs responde 200 con un token válido', async () => {
       const token = await getToken();
 
       const res = await request(app)
-        .get('/news')
+        .get('/jobs')
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(200);

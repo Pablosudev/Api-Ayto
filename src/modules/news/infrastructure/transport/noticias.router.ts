@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { createUploadForm, rutaPublica } from '../../../../utils/uploads';
 import { CreateNewsUseCase } from '../../domain/create-news.use-case';
 import { ListNewsUseCase } from '../../domain/list-news.use-case';
@@ -17,6 +17,7 @@ const primerValor = (campo: string | string[] | undefined): string | undefined =
   Array.isArray(campo) ? campo[0] : campo;
 
 interface NewsRouterDeps {
+  requireAuth: RequestHandler;
   createNew: CreateNewsUseCase;
   listNews: ListNewsUseCase;
   getNewsById: GetNewsByIdUseCase;
@@ -25,6 +26,7 @@ interface NewsRouterDeps {
 }
 
 export function NewsRouter({
+  requireAuth,
   createNew,
   listNews,
   getNewsById,
@@ -56,7 +58,7 @@ export function NewsRouter({
     }
   });
 
-  router.post('/', (req, res) => {
+  router.post('/', requireAuth, (req, res) => {
     const form = createUploadForm('news');
 
     form.parse(req, async (err, fields, files) => {
@@ -90,7 +92,7 @@ export function NewsRouter({
     });
   });
 
-  router.put('/:id', (req, res) => {
+  router.put('/:id', requireAuth, (req, res) => {
     const id = Number(req.params.id);
     const form = createUploadForm('news');
 
@@ -125,7 +127,7 @@ export function NewsRouter({
     });
   });
 
-  router.delete('/:id', async (req, res) => {
+  router.delete('/:id', requireAuth, async (req, res) => {
     const id = Number(req.params.id);
     try {
       await deleteNews.execute(id);

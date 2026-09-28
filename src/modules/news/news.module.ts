@@ -1,4 +1,4 @@
-import type { Router } from 'express';
+import type { RequestHandler, Router } from 'express';
 import type { NewsRepository } from './infrastructure/persistence/news.repository';
 import { InMemoryNewsRepository } from './infrastructure/persistence/news.repository';
 import { PrismaNewsRepository } from './infrastructure/persistence/prisma-news.repository';
@@ -19,10 +19,11 @@ function createNewsRepository(): NewsRepository {
   return new InMemoryNewsRepository();
 }
 
-export function buildNewsRouter(): Router {
+export function buildNewsRouter(requireAuth: RequestHandler): Router {
   const repository = createNewsRepository();
 
   return NewsRouter({
+    requireAuth,
     createNew: new CreateNewsUseCase(repository),
     listNews: new ListNewsUseCase(repository),
     getNewsById: new GetNewsByIdUseCase(repository),

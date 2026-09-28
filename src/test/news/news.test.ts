@@ -4,8 +4,8 @@ import { createApp } from '../../app';
 
 const app = createApp();
 
-// Todos los endpoints de recursos requieren autenticación: obtenemos un token
-// del admin semilla antes de los tests y lo enviamos en cada petición vía `api`.
+// Las lecturas de noticias son públicas. Para probar las escrituras obtenemos un
+// token del admin semilla y lo enviamos mediante este helper.
 let bearer: string;
 beforeAll(async () => {
   const res = await request(app)
@@ -15,7 +15,6 @@ beforeAll(async () => {
 });
 
 const api = {
-  get: (url: string) => request(app).get(url).set('Authorization', bearer),
   post: (url: string) => request(app).post(url).set('Authorization', bearer),
   put: (url: string) => request(app).put(url).set('Authorization', bearer),
   patch: (url: string) => request(app).patch(url).set('Authorization', bearer),
@@ -94,7 +93,7 @@ describe('Noticias - CRUD', () => {
     it('devuelve 200 y un array de noticias', async () => {
       await crearNoticia();
 
-      const res = await api.get('/news');
+      const res = await request(app).get('/news');
 
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body)).toBe(true);
@@ -102,7 +101,7 @@ describe('Noticias - CRUD', () => {
     });
 
     it('responde en formato JSON', async () => {
-      const res = await api.get('/news');
+      const res = await request(app).get('/news');
 
       expect(res.status).toBe(200);
       expect(res.headers['content-type']).toMatch(/application\/json/);
@@ -111,7 +110,7 @@ describe('Noticias - CRUD', () => {
     it('cada noticia del listado incluye los campos del modelo', async () => {
       const creada = await crearNoticia('Noticia con forma', 'Contenido de prueba');
 
-      const res = await api.get('/news');
+      const res = await request(app).get('/news');
       const noticia = res.body.find((n: { id: number }) => n.id === creada.body.id);
 
       expect(noticia).toBeDefined();
@@ -125,7 +124,7 @@ describe('Noticias - CRUD', () => {
     it('incluye una noticia recién creada con sus datos', async () => {
       const creada = await crearNoticia('Listado específico', 'Aparece en el GET');
 
-      const res = await api.get('/news');
+      const res = await request(app).get('/news');
       const noticia = res.body.find((n: { id: number }) => n.id === creada.body.id);
 
       expect(noticia).toMatchObject({
@@ -139,7 +138,7 @@ describe('Noticias - CRUD', () => {
       const primera = await crearNoticia('Primera del recuento', 'Contenido A');
       const segunda = await crearNoticia('Segunda del recuento', 'Contenido B');
 
-      const res = await api.get('/news');
+      const res = await request(app).get('/news');
       const ids = res.body.map((n: { id: number }) => n.id);
 
       expect(ids).toContain(primera.body.id);
@@ -151,7 +150,7 @@ describe('Noticias - CRUD', () => {
     it('devuelve 200 y la noticia solicitada', async () => {
       const creada = await crearNoticia('Noticia concreta', 'Contenido');
 
-      const res = await api.get(`/news/${creada.body.id}`);
+      const res = await request(app).get(`/news/${creada.body.id}`);
 
       expect(res.status).toBe(200);
       expect(res.body.id).toBe(creada.body.id);
@@ -162,7 +161,7 @@ describe('Noticias - CRUD', () => {
     it('responde en formato JSON', async () => {
       const creada = await crearNoticia();
 
-      const res = await api.get(`/news/${creada.body.id}`);
+      const res = await request(app).get(`/news/${creada.body.id}`);
 
       expect(res.status).toBe(200);
       expect(res.headers['content-type']).toMatch(/application\/json/);
@@ -171,7 +170,7 @@ describe('Noticias - CRUD', () => {
     it('la noticia devuelta incluye todos los campos del modelo', async () => {
       const creada = await crearNoticia('Con forma', 'Contenido de prueba');
 
-      const res = await api.get(`/news/${creada.body.id}`);
+      const res = await request(app).get(`/news/${creada.body.id}`);
 
       expect(typeof res.body.id).toBe('number');
       expect(typeof res.body.title).toBe('string');
@@ -184,7 +183,7 @@ describe('Noticias - CRUD', () => {
       await crearNoticia('Primera', 'Contenido A');
       const segunda = await crearNoticia('Segunda', 'Contenido B');
 
-      const res = await api.get(`/news/${segunda.body.id}`);
+      const res = await request(app).get(`/news/${segunda.body.id}`);
 
       expect(res.status).toBe(200);
       expect(res.body.id).toBe(segunda.body.id);
@@ -192,7 +191,7 @@ describe('Noticias - CRUD', () => {
     });
 
     it('devuelve 404 si la noticia no existe', async () => {
-      const res = await api.get('/news/999999');
+      const res = await request(app).get('/news/999999');
 
       expect(res.status).toBe(404);
     });
@@ -221,7 +220,7 @@ describe('Noticias - CRUD', () => {
         .field('title', 'Después')
         .field('description', 'Contenido después');
 
-      const res = await api.get(`/news/${creada.body.id}`);
+      const res = await request(app).get(`/news/${creada.body.id}`);
 
       expect(res.status).toBe(200);
       expect(res.body.title).toBe('Después');
@@ -269,7 +268,7 @@ describe('Noticias - CRUD', () => {
       expect(res.status).toBe(204);
 
       // Tras eliminarla, ya no debe encontrarse.
-      const verificacion = await api.get(`/news/${creada.body.id}`);
+      const verificacion = await request(app).get(`/news/${creada.body.id}`);
       expect(verificacion.status).toBe(404);
     });
 
@@ -278,7 +277,7 @@ describe('Noticias - CRUD', () => {
 
       await api.delete(`/news/${creada.body.id}`);
 
-      const res = await api.get('/news');
+      const res = await request(app).get('/news');
       const ids = res.body.map((n: { id: number }) => n.id);
       expect(ids).not.toContain(creada.body.id);
     });
@@ -289,7 +288,7 @@ describe('Noticias - CRUD', () => {
 
       await api.delete(`/news/${aBorrar.body.id}`);
 
-      const res = await api.get(`/news/${superviviente.body.id}`);
+      const res = await request(app).get(`/news/${superviviente.body.id}`);
       expect(res.status).toBe(200);
       expect(res.body.id).toBe(superviviente.body.id);
     });

@@ -4,8 +4,9 @@ import { createApp } from '../../app';
 
 const app = createApp();
 
-// Todos los endpoints de recursos requieren autenticación: obtenemos un token
-// del admin semilla antes de los tests y lo enviamos en cada petición vía `api`.
+// Salvo la consulta pública de días ocupados (/bookings/availability), las
+// reservas requieren autenticación: obtenemos un token del admin semilla antes
+// de los tests y lo enviamos en cada petición vía `api`.
 let bearer: string;
 beforeAll(async () => {
   const res = await request(app)
@@ -692,6 +693,112 @@ describe('Bookings', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.available).toBe(true);
+    });
+  });
+
+  // Consulta pública para el calendario de la web. Usa fechas de 2028, aisladas
+  // de los días que ocupan el resto de tests.
+  describe('GET /bookings/availability (pública)', () => {
+    const disponibilidad = (query: string) =>
+      request(app).get(`/bookings/availability${query}`);
+
+    it('responde 200 sin token con el rango consultado y sus días ocupados', async () => {
+      const res = await disponibilidad('?from=2028-03-01&to=2028-03-31');
+
+      expect(res.status).toBe(200);
+      expect(res.body.from).toBe('2028-03-01');
+      expect(res.body.to).toBe('2028-03-31');
+      expect(Array.isArray(res.body.days)).toBe(true);
+    });
+
+    it('incluye el día de una reserva pendiente y pasa a "reserved" al confirmarla', async () => {
+      const creada = await api.post('/bookings').send({
+        name: 'Reserva de marzo',
+        phone: '600000020',
+        startDate: '2028-03-04T09:00:00Z',
+        endDate: '2028-03-04T13:00:00Z',
+      });
+
+      const pendiente = await disponibilidad('?from=2028-03-01&to=2028-03-31');
+      expect(pendiente.body.days).toContainEqual({ date: '2028-03-04', state: 'pending' });
+
+      await api.patch(`/bookings/${creada.body.id}/state`).send({ state: 'reserved' });
+      const confirmada = await disponibilidad('?from=2028-03-01&to=2028-03-31');
+      expect(confirmada.body.days).toContainEqual({ date: '2028-03-04', state: 'reserved' });
+    });
+
+    it('no expone ningún dato personal del solicitante', async () => {
+      await api.post('/bookings').send({
+        name: 'Nombre Privado',
+        phone: '699999999',
+        startDate: '2028-03-08T09:00:00Z',
+        endDate: '2028-03-08T13:00:00Z',
+        notes: 'Nota privada',
+      });
+
+      const res = await disponibilidad('?from=2028-03-01&to=2028-03-31');
+      const cuerpo = JSON.stringify(res.body);
+
+      expect(cuerpo).not.toContain('Nombre Privado');
+      expect(cuerpo).not.toContain('699999999');
+      expect(cuerpo).not.toContain('Nota privada');
+      for (const day of res.body.days) {
+        expect(Object.keys(day).sort()).toEqual(['date', 'state']);
+      }
+    });
+
+    it('ocupa cada día de una reserva de varios días y la recorta al rango', async () => {
+      await api.post('/bookings').send({
+        name: 'Fin de semana largo',
+        phone: '600000021',
+        startDate: '2028-04-29T09:00:00Z',
+        endDate: '2028-05-02T13:00:00Z',
+      });
+
+      const res = await disponibilidad('?from=2028-05-01&to=2028-05-31');
+      const fechas = res.body.days.map((day: { date: string }) => day.date);
+
+      expect(fechas).toContain('2028-05-01');
+      expect(fechas).toContain('2028-05-02');
+      expect(fechas).not.toContain('2028-04-30');
+    });
+
+    it('deja libre el día de una reserva eliminada', async () => {
+      const creada = await api.post('/bookings').send({
+        name: 'Se cancela',
+        phone: '600000022',
+        startDate: '2028-06-10T09:00:00Z',
+        endDate: '2028-06-10T13:00:00Z',
+      });
+      await api.delete(`/bookings/${creada.body.id}`);
+
+      const res = await disponibilidad('?from=2028-06-01&to=2028-06-30');
+
+      expect(res.body.days).not.toContainEqual(
+        expect.objectContaining({ date: '2028-06-10' }),
+      );
+    });
+
+    it('devuelve 400 si falta from o to', async () => {
+      expect((await disponibilidad('?from=2028-03-01')).status).toBe(400);
+      expect((await disponibilidad('?to=2028-03-31')).status).toBe(400);
+    });
+
+    it('devuelve 400 si una fecha no es válida', async () => {
+      expect((await disponibilidad('?from=2028-02-30&to=2028-03-31')).status).toBe(400);
+      expect((await disponibilidad('?from=marzo&to=2028-03-31')).status).toBe(400);
+    });
+
+    it('devuelve 400 si from es posterior a to', async () => {
+      const res = await disponibilidad('?from=2028-03-31&to=2028-03-01');
+
+      expect(res.status).toBe(400);
+    });
+
+    it('devuelve 400 si el rango supera un año', async () => {
+      const res = await disponibilidad('?from=2028-01-01&to=2029-01-31');
+
+      expect(res.status).toBe(400);
     });
   });
 });

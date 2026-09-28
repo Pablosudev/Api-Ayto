@@ -29,12 +29,13 @@ export function createApp(): Express {
   // <img src>, que no puede adjuntar el token.
   app.use('/uploads', express.static(UPLOADS_ROOT));
 
-  // Las lecturas de eventos son públicas; sus escrituras aplican requireAuth
-  // dentro del router. El resto de recursos sigue protegido por completo.
+  // Las lecturas de noticias y eventos son públicas, igual que los días ocupados
+  // del refugio (sin datos personales); el resto de sus rutas aplica requireAuth
+  // dentro del router. Las ofertas de trabajo siguen protegidas por completo.
   const requireAuth = createRequireAuth(createTokenService());
-  app.use('/news', requireAuth, buildNewsRouter());
+  app.use('/news', buildNewsRouter(requireAuth));
   app.use('/events', buildEventsRouter(requireAuth));
-  app.use('/bookings', requireAuth, buildBookingsRouter());
+  app.use('/bookings', buildBookingsRouter(requireAuth));
   app.use('/jobs', requireAuth, buildJobsRouter());
 
   return app;

@@ -4,7 +4,7 @@
 
 API REST para la gestión de servicios municipales: noticias del pueblo, eventos, reservas de un local municipal y ofertas de trabajo.
 
-Las operaciones de gestión están protegidas con autenticación (ver sección 1). Las lecturas de eventos son públicas para que pueda consumirlas la web municipal.
+Las operaciones de gestión están protegidas con autenticación (ver sección 1). Las lecturas de noticias y eventos son públicas para que pueda consumirlas la web municipal.
 
 ---
 
@@ -18,7 +18,9 @@ Todos los endpoints requieren un token JWT válido, **salvo estas excepciones p�
 
 - `POST /auth/login` — necesario para obtener el token.
 - `GET /health` — comprobación de estado del servicio.
+- `GET /news` y `GET /news/:id` — consulta pública de noticias.
 - `GET /events` y `GET /events/:id` — consulta pública de eventos.
+- `GET /bookings/availability` — días ocupados del local municipal, sin datos personales.
 
 ### Modelo (Usuario administrador)
 
@@ -69,12 +71,12 @@ Todos los endpoints requieren un token JWT válido, **salvo estas excepciones p�
 
 ### Endpoints
 
-Todos requieren autenticación (ver sección 1).
+Las lecturas (`GET`) son públicas. Crear, actualizar y eliminar noticias requiere autenticación (ver sección 1).
 
 | Método | Ruta            | Descripción                                          |
 |--------|-----------------|------------------------------------------------------|
-| GET    | /news           | Listar todas las noticias                            |
-| GET    | /news/:id       | Obtener una noticia por ID                           |
+| GET    | /news           | **Público.** Listar todas las noticias               |
+| GET    | /news/:id       | **Público.** Obtener una noticia por ID              |
 | POST   | /news           | Crear una noticia (multipart/form-data para imagen)  |
 | PUT    | /news/:id       | Actualizar una noticia                               |
 | DELETE | /news/:id       | Eliminar una noticia                                 |
@@ -133,10 +135,11 @@ Las lecturas (`GET`) son públicas. Crear, actualizar y eliminar eventos requier
 
 ### Endpoints
 
-Todos requieren autenticación (ver sección 1).
+Todos requieren autenticación (ver sección 1), salvo la consulta pública de días ocupados.
 
 | Método | Ruta                       | Descripción                                        |
 |--------|----------------------------|----------------------------------------------------|
+| GET    | /bookings/availability?from=2026-10-01&to=2026-10-31 | **Público.** Días ocupados del rango (máximo 366 días), sin datos personales |
 | GET    | /bookings                  | Listar todas las reservas                          |
 | GET    | /bookings/:id              | Obtener una reserva por ID                         |
 | GET    | /bookings?state=pending    | Filtrar reservas por estado                        |
@@ -144,6 +147,13 @@ Todos requieren autenticación (ver sección 1).
 | POST   | /bookings                  | Crear una solicitud de reserva (estado: pendiente) |
 | PATCH  | /bookings/:id/state        | Cambiar estado de una reserva                      |
 | DELETE | /bookings/:id              | Eliminar una reserva                               |
+
+`GET /bookings/availability` recibe `from` y `to` en formato `YYYY-MM-DD` y devuelve
+`{ from, to, days: [{ date, state }] }`, donde `state` es `pending` o `reserved`.
+Una reserva de varios días ocupa cada uno de ellos; si dos coinciden en un día,
+prevalece la confirmada. Nunca incluye `name`, `phone` ni `notes`. Responde 400 si
+falta una fecha, si no es válida, si `from` es posterior a `to` o si el rango supera
+366 días.
 
 ---
 
